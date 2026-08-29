@@ -9,20 +9,16 @@ package app.morphe.extension.instagram.patches.story;
 import static app.morphe.extension.instagram.utils.IgStr.str;
 
 import android.app.Activity;
-import android.graphics.PorterDuff;
 import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Constructor;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import app.morphe.extension.instagram.constants.UI;
 import app.morphe.extension.instagram.utils.Pref;
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.ResourceType;
@@ -30,7 +26,6 @@ import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
 
 public final class StorySeenButton {
-    private static final String BUTTON_TAG = "piko_mark_story_seen_button";
     private static final String HEADER_MENU_ID_NAME = "header_menu_button";
     private static final int MAX_DEFERRED_BINDING_ATTEMPTS = 8;
     private static final long DEFERRED_BINDING_TIMEOUT_MILLIS = 250L;
@@ -70,27 +65,6 @@ public final class StorySeenButton {
             this.story = story;
             this.button = new WeakReference<>(button);
             this.storyKey = storyKey;
-        }
-    }
-
-    static final class ButtonPresentation {
-        final boolean enabled;
-        final float alpha;
-        final String drawableName;
-        final String colorAttributeName;
-        final String contentDescriptionName;
-
-        private ButtonPresentation(
-                boolean enabled,
-                float alpha,
-                String drawableName,
-                String colorAttributeName,
-                String contentDescriptionName) {
-            this.enabled = enabled;
-            this.alpha = alpha;
-            this.drawableName = drawableName;
-            this.colorAttributeName = colorAttributeName;
-            this.contentDescriptionName = contentDescriptionName;
         }
     }
 
@@ -141,7 +115,7 @@ public final class StorySeenButton {
         }
         Runnable invalidation = () -> {
             cancelPendingBindingThrough(generation);
-            deactivateStaleAnchor(anchor);
+            StorySeenButtonView.deactivate(anchor);
         };
         if (Looper.myLooper() == Looper.getMainLooper()) {
             invalidation.run();
@@ -214,7 +188,7 @@ public final class StorySeenButton {
         if (!isLatestCapture(generation, CAPTURE_GENERATION.get())) {
             return;
         }
-        deactivateStaleAnchor(staleAnchor);
+        StorySeenButtonView.deactivate(staleAnchor);
 
         View bound = null;
         boolean deferred = false;
@@ -266,7 +240,7 @@ public final class StorySeenButton {
             boolean headerBinding,
             int headerMenuId) {
         StorySeenBindingRetry retry = new StorySeenBindingRetry(
-                new ViewFrameHost(root),
+                StorySeenButtonView.frameHost(root),
                 () -> isLatestCapture(generation, CAPTURE_GENERATION.get()),
                 () -> attemptDeferredBinding(
                         generation,
@@ -391,8 +365,6 @@ public final class StorySeenButton {
             return null;
         }
 
-        ViewGroup parent = (ViewGroup) overflow.getParent();
-        ImageView button = findButton(parent);
         try {
             boolean anonymousStories = Pref.viewStoriesAnonymously();
             boolean overflowVisible = overflow.getVisibility() == View.VISIBLE;
@@ -413,24 +385,15 @@ public final class StorySeenButton {
                         overflowVisible,
                         available
                 );
-                if (button != null) {
-                    button.setOnClickListener(null);
-                    button.setEnabled(false);
-                    if (shouldHideUnavailableButton(retryBinding)) {
-                        button.setVisibility(View.GONE);
-                    }
-                }
+                StorySeenButtonView.setUnavailable(
+                        overflow,
+                        shouldHideUnavailableButton(retryBinding)
+                );
                 return retryBinding ? null : overflow;
             }
 
-            if (button == null) {
-                button = createButton(parent, overflow);
-            } else {
-                copyButtonGeometry(button, overflow);
-            }
-            keepAboveHeaderActions(button, parent);
-            button.setVisibility(View.VISIBLE);
             StorySeenKey storyKey = StorySeenBridge.storyKey(story.session, story.item);
+            ImageView button = StorySeenButtonView.prepare(overflow);
             BindingState bindingState = new BindingState(story, button, storyKey);
             synchronized (BINDINGS) {
                 BINDINGS.put(button, bindingState);
@@ -445,9 +408,8 @@ public final class StorySeenButton {
                     story.session,
                     story.item
             );
-            ButtonPresentation presentation = applyPresentation(button, seenState);
-
-            if (presentation.enabled) {
+            boolean enabled = StorySeenButtonView.showState(button, seenState);
+            if (enabled) {
                 button.setOnClickListener(
                         view -> markCurrentStory(bindingState));
             } else {
@@ -455,10 +417,7 @@ public final class StorySeenButton {
             }
             return bindingOutcome(overflow, true);
         } catch (Throwable throwable) {
-            if (button != null) {
-                button.setVisibility(View.GONE);
-                button.setOnClickListener(null);
-            }
+            StorySeenButtonView.setUnavailable(overflow, true);
             Logger.printException(() -> "Failed to bind mark story as seen button", throwable);
             return bindingOutcome(overflow, false);
         }
@@ -474,57 +433,6 @@ public final class StorySeenButton {
 
     static boolean shouldDisplay(boolean anonymousStories, boolean overflowVisible, boolean supportedStory) {
         return anonymousStories && overflowVisible && supportedStory;
-    }
-
-    static ButtonPresentation presentationFor(StorySeenBridge.SeenState seenState) {
-        switch (seenState) {
-            case MARKED:
-                return new ButtonPresentation(
-                        false,
-                        0.50f,
-                        UI.DRAWABLE_EYE_ICON,
-                        "igds_color_primary_icon",
-                        "piko_story_seen_sent"
-                );
-            case PENDING:
-                return new ButtonPresentation(
-                        false,
-                        1.0f,
-                        UI.DRAWABLE_EYE_ICON,
-                        "igds_color_primary_icon",
-                        "piko_story_seen_pending"
-                );
-            case UNMARKED:
-            default:
-                return new ButtonPresentation(
-                        true,
-                        1.0f,
-                        UI.DRAWABLE_EYE_ICON,
-                        "igds_color_primary_icon",
-                        "piko_mark_story_seen"
-                );
-        }
-    }
-
-    static boolean shouldReplaceDrawable(boolean hasDrawable) {
-        return !hasDrawable;
-    }
-
-    private static ButtonPresentation applyPresentation(
-            ImageView button,
-            StorySeenBridge.SeenState seenState) {
-        ButtonPresentation presentation = presentationFor(seenState);
-        button.setEnabled(presentation.enabled);
-        button.setAlpha(presentation.alpha);
-        button.setContentDescription(str(presentation.contentDescriptionName));
-        if (shouldReplaceDrawable(button.getDrawable() != null)) {
-            UI.setThemedIcon(button, presentation.drawableName);
-        }
-        button.setColorFilter(
-                UI.getThemedColour(presentation.colorAttributeName),
-                PorterDuff.Mode.SRC_ATOP
-        );
-        return presentation;
     }
 
     static boolean isCurrentBinding(Object expected, Object current) {
@@ -546,278 +454,11 @@ public final class StorySeenButton {
         return previousItem != null && selectedItem != previousItem;
     }
 
-    static boolean shouldDeferFirstDraw(
-            boolean attached,
-            int buttonWidth,
-            int buttonHeight,
-            int overflowWidth,
-            int overflowHeight,
-            boolean alreadyDeferred) {
-        return attached
-                && !alreadyDeferred
-                && (buttonWidth == 0 || buttonHeight == 0)
-                && overflowWidth > 0
-                && overflowHeight > 0;
-    }
-
     private static View staleBoundAnchorFor(Object selectedItem, boolean headerBinding) {
         if (!headerBinding && !shouldInvalidateBoundStory(selectedItem, boundItem)) {
             return null;
         }
         return boundAnchor.get();
-    }
-
-    private static void deactivateStaleAnchor(View anchor) {
-        if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) {
-            return;
-        }
-        ViewGroup parent = (ViewGroup) anchor.getParent();
-        ImageView button = findButton(parent);
-        if (button != null) {
-            button.setEnabled(false);
-            button.setOnClickListener(null);
-        }
-    }
-
-    private static void hideButton(ViewGroup parent) {
-        ImageView button = findButton(parent);
-        if (button != null) {
-            button.setVisibility(View.GONE);
-            button.setEnabled(false);
-            button.setOnClickListener(null);
-        }
-    }
-
-    private static final class ViewFrameHost implements
-            StorySeenBindingRetry.FrameHost,
-            ViewTreeObserver.OnPreDrawListener,
-            View.OnAttachStateChangeListener {
-        private final View root;
-        private StorySeenBindingRetry.FrameCallback callback;
-        private boolean observing;
-        private boolean observingPreDraw;
-
-        private ViewFrameHost(View root) {
-            this.root = root;
-        }
-
-        @Override
-        public boolean isAttached() {
-            return root.isAttachedToWindow();
-        }
-
-        @Override
-        public void addFrameCallback(StorySeenBindingRetry.FrameCallback value) {
-            callback = value;
-            observing = true;
-            root.addOnAttachStateChangeListener(this);
-            if (root.isAttachedToWindow()) {
-                addPreDrawListener();
-            }
-        }
-
-        @Override
-        public void removeFrameCallback(StorySeenBindingRetry.FrameCallback value) {
-            if (!observing || callback != value) {
-                return;
-            }
-            observing = false;
-            root.removeOnAttachStateChangeListener(this);
-            removePreDrawListener();
-            callback = null;
-        }
-
-        @Override
-        public boolean onPreDraw() {
-            StorySeenBindingRetry.FrameCallback current = callback;
-            // Do not draw a native-only header after a deferred bind adds the Piko action.
-            return current == null || !current.onFrame();
-        }
-
-        @Override
-        public void onViewAttachedToWindow(View view) {
-            StorySeenBindingRetry.FrameCallback current = callback;
-            if (current == null) {
-                return;
-            }
-            try {
-                addPreDrawListener();
-                current.onFrame();
-            } catch (Throwable ignored) {
-                current.onFrame();
-            }
-        }
-
-        @Override
-        public void onViewDetachedFromWindow(View view) {
-            StorySeenBindingRetry.FrameCallback current = callback;
-            if (current != null) {
-                current.onFrame();
-            }
-        }
-
-        private void addPreDrawListener() {
-            if (observingPreDraw) {
-                return;
-            }
-            ViewTreeObserver observer = root.getViewTreeObserver();
-            if (!observer.isAlive()) {
-                throw new IllegalStateException("Story root ViewTreeObserver is not alive");
-            }
-            observer.addOnPreDrawListener(this);
-            observingPreDraw = true;
-        }
-
-        private void removePreDrawListener() {
-            if (!observingPreDraw) {
-                return;
-            }
-            observingPreDraw = false;
-            ViewTreeObserver observer = root.getViewTreeObserver();
-            if (observer.isAlive()) {
-                observer.removeOnPreDrawListener(this);
-            }
-        }
-    }
-
-    private static ImageView createButton(ViewGroup parent, View overflow) {
-        ImageView button = new ImageView(parent.getContext());
-        button.setTag(BUTTON_TAG);
-        button.setScaleType(ImageView.ScaleType.CENTER);
-        button.setClickable(true);
-        button.setFocusable(true);
-        button.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-        copyButtonGeometry(button, overflow);
-
-        int overflowIndex = parent.indexOfChild(overflow);
-        int insertIndex = overflowIndex < 0 ? parent.getChildCount() : overflowIndex;
-        ViewGroup.LayoutParams layoutParams = copyLayoutParams(overflow.getLayoutParams());
-        parent.addView(button, insertIndex, layoutParams);
-        new FirstLayoutDrawGate(button, parent, overflow).start();
-        return button;
-    }
-
-    private static final class FirstLayoutDrawGate implements
-            ViewTreeObserver.OnPreDrawListener,
-            View.OnAttachStateChangeListener {
-        private final ImageView button;
-        private final ViewGroup parent;
-        private final View overflow;
-        private boolean observing;
-        private boolean deferred;
-
-        private FirstLayoutDrawGate(ImageView button, ViewGroup parent, View overflow) {
-            this.button = button;
-            this.parent = parent;
-            this.overflow = overflow;
-        }
-
-        private void start() {
-            ViewTreeObserver observer = parent.getViewTreeObserver();
-            if (!observer.isAlive()) {
-                return;
-            }
-            observing = true;
-            parent.addOnAttachStateChangeListener(this);
-            observer.addOnPreDrawListener(this);
-        }
-
-        @Override
-        public boolean onPreDraw() {
-            boolean defer = shouldDeferFirstDraw(
-                    button.isAttachedToWindow(),
-                    button.getWidth(),
-                    button.getHeight(),
-                    overflow.getWidth(),
-                    overflow.getHeight(),
-                    deferred
-            );
-            if (defer) {
-                deferred = true;
-                parent.requestLayout();
-                return false;
-            }
-            stop();
-            return true;
-        }
-
-        @Override
-        public void onViewAttachedToWindow(View view) {
-        }
-
-        @Override
-        public void onViewDetachedFromWindow(View view) {
-            stop();
-        }
-
-        private void stop() {
-            if (!observing) {
-                return;
-            }
-            observing = false;
-            parent.removeOnAttachStateChangeListener(this);
-            ViewTreeObserver observer = parent.getViewTreeObserver();
-            if (observer.isAlive()) {
-                observer.removeOnPreDrawListener(this);
-            }
-        }
-    }
-
-    private static void keepAboveHeaderActions(ImageView button, ViewGroup parent) {
-        float highestSiblingZ = 0.0f;
-        for (int index = 0; index < parent.getChildCount(); index++) {
-            View child = parent.getChildAt(index);
-            if (child != button) {
-                highestSiblingZ = Math.max(highestSiblingZ, child.getZ());
-            }
-        }
-
-        // Instagram promotes header badges during its opening transition.
-        button.setZ(drawZAbove(highestSiblingZ));
-    }
-
-    static float drawZAbove(float highestExistingZ) {
-        return highestExistingZ + 1.0f;
-    }
-
-    private static void copyButtonGeometry(ImageView button, View anchor) {
-        button.setPadding(
-                anchor.getPaddingLeft(),
-                anchor.getPaddingTop(),
-                anchor.getPaddingRight(),
-                anchor.getPaddingBottom()
-        );
-        button.setMinimumWidth(anchor.getMinimumWidth());
-        button.setMinimumHeight(anchor.getMinimumHeight());
-    }
-
-    private static ImageView findButton(ViewGroup parent) {
-        for (int index = 0; index < parent.getChildCount(); index++) {
-            View child = parent.getChildAt(index);
-            if (child instanceof ImageView && BUTTON_TAG.equals(child.getTag())) {
-                return (ImageView) child;
-            }
-        }
-        return null;
-    }
-
-    private static ViewGroup.LayoutParams copyLayoutParams(ViewGroup.LayoutParams source) {
-        if (source == null) {
-            return new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-        }
-
-        try {
-            Constructor<?> constructor = source.getClass().getConstructor(ViewGroup.LayoutParams.class);
-            return (ViewGroup.LayoutParams) constructor.newInstance(source);
-        } catch (ReflectiveOperationException ignored) {
-            if (source instanceof ViewGroup.MarginLayoutParams) {
-                return new ViewGroup.MarginLayoutParams((ViewGroup.MarginLayoutParams) source);
-            }
-            return new ViewGroup.LayoutParams(source);
-        }
     }
 
     private static void markCurrentStory(BindingState bindingState) {
@@ -841,7 +482,7 @@ public final class StorySeenButton {
                 listener
         )) {
             StorySeenBridge.SeenState state = StorySeenBridge.state(story.session, story.item);
-            applyPresentation(button, state);
+            StorySeenButtonView.showState(button, state);
             if (state == StorySeenBridge.SeenState.PENDING) {
                 button.postDelayed(
                         () -> refreshExpiredPendingBinding(bindingState),
@@ -851,7 +492,7 @@ public final class StorySeenButton {
             return;
         }
 
-        applyPresentation(button, StorySeenBridge.SeenState.UNMARKED);
+        StorySeenButtonView.showState(button, StorySeenBridge.SeenState.UNMARKED);
     }
 
     static StorySeenRequestScope.Listener resultListener(
@@ -898,8 +539,8 @@ public final class StorySeenButton {
             if (!isCurrentBinding(bindingState, currentBinding(button))) {
                 return;
             }
-            ButtonPresentation presentation = applyPresentation(button, state);
-            if (presentation.enabled) {
+            boolean enabled = StorySeenButtonView.showState(button, state);
+            if (enabled) {
                 button.setOnClickListener(view -> markCurrentStory(bindingState));
             } else {
                 button.setOnClickListener(null);

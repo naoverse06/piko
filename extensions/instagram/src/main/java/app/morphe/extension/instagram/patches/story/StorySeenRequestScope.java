@@ -73,10 +73,6 @@ final class RequestRegistry {
     private final Map<Object, Permit> activePermits = new IdentityHashMap<>();
     private final ThreadLocal<ScopeFrame> scope = new ThreadLocal<>();
 
-    RequestRegistry(LongSupplier clock, long permitTtlMillis, int maxPendingPermits) {
-        this(clock, permitTtlMillis, maxPendingPermits, ignored -> { });
-    }
-
     RequestRegistry(
             LongSupplier clock,
             long permitTtlMillis,
@@ -86,14 +82,6 @@ final class RequestRegistry {
         this.permitTtlMillis = permitTtlMillis;
         this.maxPendingPermits = maxPendingPermits;
         this.completionConsumer = completionConsumer;
-    }
-
-    synchronized boolean register(Object request) {
-        return register(request, null);
-    }
-
-    synchronized boolean register(Object request, StorySeenKey storyKey) {
-        return register(request, storyKey, null);
     }
 
     synchronized boolean register(
@@ -137,10 +125,6 @@ final class RequestRegistry {
         if (permitted || parent != null) {
             scope.set(new ScopeFrame(request, permitted, parent));
         }
-    }
-
-    void exit(Object request) {
-        finish(request, false);
     }
 
     void exitActive() {

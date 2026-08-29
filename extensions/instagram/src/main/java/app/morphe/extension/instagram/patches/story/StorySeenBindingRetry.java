@@ -69,10 +69,6 @@ final class StorySeenBindingRetry {
         }
     }
 
-    boolean isActive() {
-        return active;
-    }
-
     void cancel() {
         stop(false);
     }
