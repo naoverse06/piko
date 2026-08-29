@@ -25,6 +25,7 @@ import app.morphe.extension.shared.ShareLinkSanitizer;
 import app.morphe.extension.shared.Utils;
 import app.morphe.extension.instagram.constants.PostType;
 import app.morphe.extension.instagram.constants.Constants;
+import app.morphe.extension.instagram.patches.story.StorySeenRequestScope;
 import app.morphe.extension.crimera.PikoUtils;
 
 import app.morphe.extension.instagram.settings.ActivityHook;
@@ -81,7 +82,10 @@ public class Links {
     }
 
     public static boolean setStorySeen(boolean seenStatus){
-        return Pref.viewStoriesAnonymously() ? true:seenStatus;
+        return StorySeenRequestScope.resolveSeenStatus(
+                seenStatus,
+                Pref.viewStoriesAnonymously()
+        );
     }
 
     public static boolean shouldBlockOnboardingScreen(String appId) {
@@ -126,7 +130,8 @@ public class Links {
                         || path.contains("/consent/new_user_flow/")) {
                     shouldBlockUri = DISABLE_ONBOARDING_PERMISSION_PROMPTS;
                 } else if (path.contains("/api/v2/media/seen/")) {
-                    shouldBlockUri = Pref.viewStoriesAnonymously();
+                    shouldBlockUri = Pref.viewStoriesAnonymously()
+                            && !StorySeenRequestScope.isActive();
                 } else if (path.contains("/heartbeat_and_get_viewer_count/")) {
                     shouldBlockUri = Pref.viewLiveAnonymously();
                 } else if (path.contains("/feed/reels_tray/")
