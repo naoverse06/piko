@@ -69,9 +69,9 @@ To patch with Twitter/X version 11.88 to 12.4, you must include patches from ano
 ## ⚙️ Patch Details
 
 <!-- PATCHES_START -->
-> **[v3.10.0-dev.4](https://github.com/crimera/piko/releases/tag/v3.10.0-dev.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;131 patches total
+> **[v3.10.0-dev.5](https://github.com/crimera/piko/releases/tag/v3.10.0-dev.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`dev`&nbsp;&nbsp;•&nbsp;&nbsp;132 patches total
 <details>
-<summary>📦 Twitter&nbsp;&nbsp;•&nbsp;&nbsp;74 patches</summary>
+<summary>📦 Twitter&nbsp;&nbsp;•&nbsp;&nbsp;75 patches</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -147,6 +147,7 @@ To patch with Twitter/X version 11.88 to 12.4, you must include patches from ano
 | [Remove premium upsell](#remove-premium-upsell) | Removes premium upsells |  |
 | [Remove search suggestions](#remove-search-suggestions) | Hide/Remove search suggestion in explore section |  |
 | [Remove view count](#remove-view-count) | Removes the view count from the bottom of tweets |  |
+| [Restore legacy follower lists](#restore-legacy-follower-lists) | Restores the legacy follower and following list screen. |  |
 | [Round off numbers](#round-off-numbers) | Enable or disable rounding off numbers |  |
 | [Selectable Text](#selectable-text) | Makes bio and username selectable |  |
 | [Share Tweet as Image](#share-tweet-as-image) | Share tweets as rendered image. Requires X 11.0.0-release.0 or higher. |  |

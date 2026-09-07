@@ -1,3 +1,9 @@
+## [3.10.0-dev.5](https://github.com/crimera/piko/compare/v3.10.0-dev.4...v3.10.0-dev.5) (2026-09-07)
+
+### 🐛 Bug Fixes
+
+* **Twitter:** restore relationship actions in user lists ([854f5e2](https://github.com/crimera/piko/commit/854f5e26831c997e376a7b68094a7fbde89fc790))
+
 ## [3.10.0-dev.4](https://github.com/crimera/piko/compare/v3.10.0-dev.3...v3.10.0-dev.4) (2026-09-04)
 
 ### 🐛 Bug Fixes
