@@ -296,13 +296,15 @@ public class DownloadUtils {
         String username = mediaInfo.getUserData().getUsername();
         String subFolder = getSubfolderName(username);
         List<DownloadRequest> requests = new ArrayList<>(indexes.size());
+        List<MediaData> children = new ArrayList<>(indexes.size());
         for (int index : new TreeSet<>(indexes)) {
             if (index < 0 || index >= total) throw new IllegalArgumentException("Invalid carousel index");
             MediaData child = mediaInfo.getMediaAt(index);
+            children.add(child);
             requests.add(buildMediaRequest(mediaInfo, child, index, MediaType.ANY, child.getMediaLink(),
                     subFolder, username + "_" + child.getDownloadFilename(MediaType.ANY), null));
         }
-        getDownloadAllDownloader(context).enqueueBatch(requests);
+        HighResolutionImages.enqueue(getDownloadAllDownloader(context), requests, mediaInfo, children);
     }
 
     // Position is set to -1 if we want to download all medias from the media info object.
@@ -347,7 +349,7 @@ public class DownloadUtils {
             // post, never a child; without a download folder, enqueue asks for one at once.
             if (!mediaType.equals(MediaType.IMAGE) || !mediaData.isVideo()
                     || !StorageUtils.checkStoragePermissions()) {
-                downloader.enqueue(request);
+                HighResolutionImages.enqueue(downloader, Arrays.asList(request), mediaInfo, Arrays.asList(mediaData));
                 return;
             }
             MediaInterface cover = mediaData.getBestImage();

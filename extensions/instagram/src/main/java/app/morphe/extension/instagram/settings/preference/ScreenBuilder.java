@@ -916,6 +916,19 @@ public class ScreenBuilder {
                 )
         );
 
+        if (SettingsStatus.downloadMedia && app.morphe.extension.instagram.patches.download.HighResolutionImages.isAvailable()) {
+            addPreference(
+                    helper.availableWhen(
+                            helper.switchPreference(
+                                    str("piko_download_high_quality_images"),
+                                    str("piko_download_high_quality_images_desc"),
+                                    Settings.DOWNLOAD_HIGH_QUALITY_IMAGES
+                            ),
+                            () -> SharedPref.getBooleanPref(Settings.ENABLE_DOWNLOAD)
+                    )
+            );
+        }
+
         addPreference(
                 helper.switchPreference(
                         str("piko_prefer_dash_format"),

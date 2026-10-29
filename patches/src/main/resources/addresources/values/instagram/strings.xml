@@ -226,6 +226,8 @@
     <string name="piko_download_username_folder">Split media by username</string>
     <string name="piko_download_username_folder_desc">Creates subfolders based on username</string>
     <string name="piko_prefer_dash_format">Prefer DASH format</string>
+    <string name="piko_download_high_quality_images">Download high-resolution images</string>
+    <string name="piko_download_high_quality_images_desc">Requests higher-resolution photos only when saving, without changing image viewing. Uses the available image if a higher resolution cannot be fetched.</string>
     <string name="piko_prefer_dash_format_desc">Downloads videos as the sharpest DASH rendition Instagram lists, up to 1080p AV1, instead of the 720p H.264 file</string>
     <string name="piko_dash_audio_aac_lc">Convert DASH audio to AAC</string>
     <string name="piko_dash_audio_aac_lc_desc">Re-encodes the xHE-AAC sound of DASH downloads as AAC-LC at 192 kbps, which every player can play</string>

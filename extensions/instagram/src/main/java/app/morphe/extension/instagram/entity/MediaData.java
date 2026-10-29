@@ -39,6 +39,10 @@ public class MediaData extends Entity {
         this.userSession = userSession;
     }
 
+    public UserSession getUserSession() {
+        return userSession;
+    }
+
     private Class<?> getHelperClass() throws Exception {
         return Class.forName("className");
     }

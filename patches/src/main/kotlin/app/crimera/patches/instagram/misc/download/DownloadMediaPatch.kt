@@ -62,6 +62,8 @@ val downloadMediaPatch =
 
         execute {
 
+            enableHighResolutionImageRequests()
+
             addOverflowMenuButtonAttributes("PIKO_DOWNLOAD", "downloadOverflowButton")
 
             // DM media downloader.
